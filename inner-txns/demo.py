@@ -26,8 +26,9 @@ def demo():
 
     sp = client.suggested_params()
     pooled_group = assign_group_id([
-        get_fund_txn(addr, sp, app_addr, 500000),
+        get_fund_txn(addr, sp, app_addr, 5000000),
         get_app_call(addr, sp, app_id, ["inner-txn-demo", "itxnd", (1000).to_bytes(8,'big')]), 
+        get_app_call(addr, sp, app_id, ["inner-txn-demo2", "itxnd2", (1000).to_bytes(8,'big')]), 
     ])
 
     signed_group = [txn.sign(pk) for txn in pooled_group]

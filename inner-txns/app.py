@@ -1,4 +1,4 @@
-from pyteal import Int, Seq, Txn, Global, compileTeal, Return, OnComplete, Mode, Cond, Concat, Bytes, InnerTxnBuilder, TxnField, TxnType, And, Btoi
+from pyteal import Int, Seq, Txn, Global, compileTeal, Return, OnComplete, Mode, Cond, Concat, Bytes, InnerTxnBuilder, TxnField, TxnType, And, Btoi, ScratchVar, For
 import os
 
 from util import itoa
@@ -10,34 +10,37 @@ def approval():
     # Checks that the sender is the app creator
     is_app_creator = Txn.sender() == Global.creator_address()
 
+    i = ScratchVar()
+    init = i.store(Int(0))
+    cond = i.load()<Int(16)
+    iter = i.store(i.load() + Int(1))
+
     # This is the main functionality of this app
-    submit_inner_txn = And(
-        is_app_creator, # First check that the sender is the app creator
-        Seq(            # Seq is used to group a set of operations with only the last returning a value on the stack 
+    submit_inner_txn = Seq(
+        For(init, cond, iter).Do(
+            Seq(            # Seq is used to group a set of operations with only the last returning a value on the stack 
+                # Start to build the transaction builder
+                InnerTxnBuilder.Begin(),    
 
-            # Start to build the transaction builder
-            InnerTxnBuilder.Begin(),    
+                # This method accepts a dictionary of TxnField to value so all fields may be set 
+                InnerTxnBuilder.SetFields({ 
+                    TxnField.type_enum: TxnType.AssetConfig,
+                    TxnField.config_asset_name: Txn.application_args[0],
+                    TxnField.config_asset_unit_name: Txn.application_args[1],
+                    TxnField.config_asset_manager: Global.current_application_address(),
+                    TxnField.config_asset_clawback: Global.current_application_address(),
+                    TxnField.config_asset_reserve: Global.current_application_address(),
+                    TxnField.config_asset_freeze: Global.current_application_address(),
+                    TxnField.config_asset_total: Btoi(Txn.application_args[2]),
+                    TxnField.config_asset_decimals: Int(0),
+                }),
 
-            # This method accepts a dictionary of TxnField to value so all fields may be set 
-            InnerTxnBuilder.SetFields({ 
-                TxnField.type_enum: TxnType.AssetConfig,
-                TxnField.config_asset_name: Txn.application_args[0],
-                TxnField.config_asset_unit_name: Txn.application_args[1],
-                TxnField.config_asset_manager: Global.current_application_address(),
-                TxnField.config_asset_clawback: Global.current_application_address(),
-                TxnField.config_asset_reserve: Global.current_application_address(),
-                TxnField.config_asset_freeze: Global.current_application_address(),
-                TxnField.config_asset_total: Btoi(Txn.application_args[2]),
-                TxnField.config_asset_decimals: Int(0),
-            }),
-
-            # Submit the transaction we just built
-            InnerTxnBuilder.Submit(),
-
-            # Return 1 so the outer And evaluates to true
-            Int(1)
-        )
-    )
+                # Submit the transaction we just built
+                InnerTxnBuilder.Submit(),
+            )
+        ),
+        Int(1)
+    ) 
 
     # Generic boilerplate router for an application to handle the different OnComplete settings
     return Cond(
